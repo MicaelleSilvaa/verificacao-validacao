@@ -1,0 +1,62 @@
+name: Remove Deactivated Repository Members
+
+on:
+  schedule:
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+
+jobs:
+  remove-members:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup action environment variables
+        id: setup-action
+        run: |
+          touch .env
+          echo "LIFERAY_ORGANIZATION_NAME=liferay" >> "$GITHUB_ENV"
+          echo "REPO_NAME=automated-tests" >> "$GITHUB_ENV"
+          echo "UPGRADES_TEAM_NAME=liferay-upgrades" >> "$GITHUB_ENV"
+
+      - name: Get repo collaborators
+        id: get-repo-collaborators
+        run: |
+          # Get the list of collaborators for the repository
+          collaborators=$(curl -s -H "Authorization: token ${{ secrets.REMOVAL_MEMBER_ACTION_TOKEN }}" https://api.github.com/repos/${{env.UPGRADES_TEAM_NAME}}/${{env.REPO_NAME}}/collaborators)
+          
+          if [[ -z "$collaborators" ]]; then
+            echo "No collaborators found for the repository."
+            exit 0
+          fi
+
+          {
+            echo 'colaborators_json<<EOF'
+              echo $collaborators
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+          
+      - name: Iterate over collaborators and remove any who are no longer inside the Liferay Inc. organization.
+        run: |
+          # Filter the complete array of collaborators to one with only their logins without quotes
+          collaborators_array=$(jq -r -c '.[] | .login' <<< '${{steps.get-repo-collaborators.outputs.colaborators_json}}')
+          
+          if [[ "${collaborators_array[@]}" == "" ]]; then
+            echo "No collaborators found for the repository."
+            exit 0  # Exit with success code if no collaborators
+          fi
+      
+          for member in ${collaborators_array[@]}; do
+            # Check if the member is in the organization
+            member_info=$(curl -s -H "Authorization: token ${{ secrets.REMOVAL_MEMBER_ACTION_TOKEN }}" https://api.github.com/orgs/${{env.LIFERAY_ORGANIZATION_NAME}}/members/${member})
+            membership_status=$(jq -r -c '. | .status' <<< $member_info)
+
+            if [[ $(jq -r -c '. | .status' <<< $member_info) == 404 ]]; then
+               echo "Member ${member} is no longer inside of the Liferay Inc. organization. Removing from the repository..."
+               curl -X DELETE -H "Authorization: token ${{ secrets.REMOVAL_MEMBER_ACTION_TOKEN }}" https://api.github.com/repos/${{env.UPGRADES_TEAM_NAME}}/${{env.REPO_NAME}}/collaborators/${member}
+            else
+              echo "Member ${member} is still active inside the Liferay Inc. organization. Skipping removal."
+            fi
+          done
+

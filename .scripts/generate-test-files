@@ -1,0 +1,387 @@
+#!/bin/bash
+
+declare -A users
+declare -A configs
+declare -A environments
+declare -A test_cases_by_title
+declare -A test_spec_data_by_title
+
+show_help() {
+  cat <<EOF 
+Usage: $(basename "$0") [OPTIONS] path-to-tsv
+
+This script automates the generation of test files for a project.
+It reads a .tsv file and creates the necessary fixtures, pages, and tests files, as well as a {project-name}.config.ts file.
+If a .env file is present in the directory, its values will be used to generate {project-name}.config.ts.
+
+OPTIONS:
+  -h, --help                Display this help message
+  -n, --project-name NAME   Specify the project name (default "project")
+  -e, --ignore-env          Ignore the .env file if present in the project directory
+
+ARGUMENTS:
+  path-to-tsv               Path to the TSV file (required)
+
+The expected .tsv template is:
+
++---------+-----------+---------------+---------------------+-------+------------+----------+
+| Context | Describe  | Test Case Name | Needs Authentication | Steps | Test Status | Notes |
++---------+-----------+---------------+---------------------+-------+------------+----------+
+
+Context => Groups tests into folders for better organization.
+Describe (REQUIRED) => Represents the test suite title, used as the first argument for test.describe().
+Test Case Name => The name of individual test cases, used as the first argument for test().
+Needs Authentication =>  Indicates whether authentication is required for the test. 
+Steps => The sequence of actions needed to execute the test.
+Test Status => Specifies if the test will be automated or not.
+Notes => Additional information related to the test.
+
+EXAMPLES:
+  $(basename "$0") data.tsv
+  $(basename "$0") -n "My Project" data.tsv
+  $(basename "$0") --project-name "My Project" data.tsv
+EOF
+}
+
+escape_single_quote() {
+  echo "${1//\'/\\\'}"
+}
+
+normalize_string() {
+  local output=""
+  for word in $(echo "${1,,}" | sed 's/_/ /g' | sed 's/[^a-z ]//g'); do
+    output+="${word^}"
+  done
+  echo "${output,}"
+}
+
+add_test_case() {
+  test_cases_by_title["$test_title"]+=$(
+    {
+      echo "test('$(escape_single_quote "$test_name")', async ({ ${pom_name,} }) => {"
+      echo "/**"
+      
+      if [[ -n $(echo "$notes" | xargs) ]]; then
+        echo -e "\t\t\t# NOTES"
+        while IFS= read -r note_line; do
+          echo -e "\t\t\t# $note_line"
+        done <<< "$(echo "$notes" | fold -s -w 60)"
+        echo ""
+      fi
+      
+      while IFS= read -r step_line; do
+        echo -e "\t\t\t$step_line"  
+      done <<< "$(echo "$steps" | sed 's/\([[:space:]]\)\(And\|When\|Then\)\([[:space:]]\)/\1\n\2\3/g')"
+
+      echo -e "\t\t*/"
+      echo "});"
+    }
+  )
+}
+
+define_columns_and_dir() {
+  context=$(echo "$line" | cut -f1)
+  describe=$(echo "$line" | cut -f2)
+  test_name=$(echo "$line" | cut -f3)
+  needs_authentication=$(echo "$line" | cut -f4)
+  steps=$(echo "$line" | cut -f5)
+  test_status=$(echo "$line" | cut -f6)
+  notes="$(echo "$line" | cut -f7 | tr -d '\r')"
+
+  has_context=false
+  normalized_context=""
+  test_title=${describe}
+  normalized_describe=$(normalize_string "$describe")
+
+  if [[ -n $(echo "$context" | xargs) ]]; then
+    has_context=true
+    test_title="$context - $describe"
+    normalized_context=$(normalize_string "$context")
+  fi
+}
+
+create_POM_file() {
+  pom_dir="pages/${normalized_describe}"
+  pom_name="${normalized_describe^}Page"
+
+  if $has_context; then
+    pom_dir="pages/${normalized_context}/${normalized_describe}"
+  fi
+
+  mkdir -p "$pom_dir"
+
+  {
+    echo "import { Page } from '@playwright/test';"
+    echo ""
+    echo "export class ${pom_name} {"
+    echo "  constructor(readonly page: Page) {}"
+    echo "}"
+  } > "$pom_dir/$pom_name.ts"
+}
+
+create_fixture_file() {
+  fixture_name="${normalized_describe}"
+
+  if $has_context; then
+    fixture_name="${normalized_context}${normalized_describe^}"
+  fi
+
+  mkdir -p "fixtures"
+
+  {
+    echo "import { test } from '@playwright/test';"
+    echo "import { $pom_name } from '../$pom_dir/$pom_name';"
+    echo ""
+    echo "interface ${fixture_name^}Fixture {"
+    echo "  ${pom_name,}: ${pom_name};"
+    echo "}"
+    echo ""
+    echo "export const ${fixture_name}Test = test.extend<${fixture_name^}Fixture>({"
+    echo "  ${pom_name,}: async ({ page }, use) => {"
+    echo "    await use(new ${pom_name}(page));"
+    echo "  }"
+    echo "});"
+  } > "fixtures/${fixture_name}Test.ts"
+}
+
+create_config_file() {
+  local dir="tests/${normalized_describe}"
+  local config_name="$normalized_describe"
+
+  if $has_context; then
+    dir="tests/${normalized_context}/${normalized_describe}"
+    config_name="$normalized_context${normalized_describe^}"
+  fi  
+
+  configs["$config_name"]="$dir"
+  test_spec_data_by_title["$test_title"]+="$fixture_name,$dir,${normalized_describe}"$'\n'
+
+  mkdir -p "$dir"
+
+  {
+    echo "import { Project } from '@playwright/test';"
+    echo ""
+    echo "export const config: Project = {"
+    echo "  name: '${config_name}',"
+    echo "  testDir: '$dir',"
+
+    if [[ "${needs_authentication,,}" == "true" ]]; then
+      echo "  dependencies: ['setup'],"
+      echo "  use: {"
+      echo "    storageState: '',"
+      echo "  },"
+    fi
+
+    echo "}"
+  } > "$dir/config.ts"
+}
+
+create_spec_file() {
+  for title in "${!test_cases_by_title[@]}"; do
+    IFS=, read -r fixture_name test_spec_dir file_name <<< "${test_spec_data_by_title[$title]}"
+    folder_level=$(( $(echo "$test_spec_dir" | tr -cd "/" | wc -c) + 1 ))
+    level_string=$(printf '../%.0s' $(seq 1 "$folder_level"))
+    fixture_dir="'${level_string}fixtures/${fixture_name}Test'"
+
+    {
+      echo "import { ${fixture_name}Test as test } from $fixture_dir;"
+      echo ""
+      echo "test.describe('$(escape_single_quote "$title")', () => {"      
+      echo "${test_cases_by_title[$title]}"
+      echo "});"
+    } > "$test_spec_dir/$file_name.spec.ts"  
+  done
+}
+
+read_env_file() {
+  if $ignore_env; then
+    echo -e "❌ \e[3;2mIgnoring .env file\e[0m"
+    return
+  elif [[ -f ".env" && -s ".env" ]]; then
+    echo -e "🔑 \e[3;2mReading .env file\e[0m"
+    mapfile -t env_lines < .env
+    for env_line in "${env_lines[@]}"; do
+      original_key="${env_line%%=*}"
+
+      if [[ "$original_key" == *"BASE_URL"* ]]; then
+        normalized_key=$(normalize_string "$original_key")
+        environments["$normalized_key"]="$original_key"
+      elif [[ -n "$original_key" ]]; then
+        key=$(echo "$original_key" | sed -E 's/(_PASSWORD|_EMAIL)$//')
+        normalized_key=$(normalize_string "$key")
+        users["$normalized_key"]+="$original_key,"
+      fi
+    done
+  elif [[ ! -s ".env" ]]; then
+    echo -e "❌ \e[3;2m.env file found, but ignored because it's empty\e[0m"
+  else
+    echo -e "❌ \e[3;2mNo .env file found\e[0m"
+  fi
+}
+
+create_project_config() {
+  echo -e "📐 \e[3;2mCreating the ${project_name^} config file\e[0m"
+ {
+    echo "import { loadEnvFile } from 'process';"
+    echo ""
+    echo "loadEnvFile(process.cwd() + '/.env');"
+    echo ""
+    echo "export const ${normalized_project_name}Config = {"
+    echo "  environments: {"
+
+    for environment in "${!environments[@]}"; do
+      echo "    ${environment,}: process.env.${environments["$environment"]}!,"
+    done
+
+    echo "},"
+    echo ""
+    echo "  users: {"
+    
+    for user in "${!users[@]}"; do
+      IFS=, read -r first second _ <<< "${users["$user"]}"
+      first_key=${first##*_}
+      second_key=${second##*_}
+
+      echo "    ${user,}: {"
+      echo "      ${first_key,,}: process.env.${first}!,"
+      echo "      ${second_key,,}: process.env.${second}!,"
+      echo "    },"
+    done
+
+    echo "  }"
+    echo "};"
+  } > "${normalized_project_name}.config.ts"
+}
+
+create_playwright_config() {
+  has_base_url="${environments["baseUrl"]}"
+  sorted_configs=($(printf "%s\n" "${!configs[@]}" | sort))
+  {
+    echo "import { defineConfig } from '@playwright/test';"
+
+    if [ -n "$has_base_url" ]; then
+      echo "import { ${normalized_project_name}Config } from './${normalized_project_name}.config';"
+    fi
+    echo ""
+
+    for config in "${sorted_configs[@]}"; do
+      echo "import { config as ${config} } from './${configs["$config"]}/config';"
+    done
+
+    echo ""
+    echo "export default defineConfig({"
+	  echo "  testDir: './tests',"
+    echo ""
+  	echo "  reporter: ["
+		echo "    ['html', { open: 'never',}],],"
+    echo ""
+    echo "  use: {"
+
+    if [ -n "$has_base_url" ]; then
+      echo "   baseURL: ${normalized_project_name}Config.environments.baseUrl,"
+    fi
+
+    echo "   screenshot: 'only-on-failure',"
+    echo "   trace: 'on-first-retry',"
+    echo "},"
+    echo ""
+    echo "  projects: ["
+
+    for config in "${sorted_configs[@]}"; do
+      echo "    $config,"
+    done
+
+    echo "  ],"
+    echo "});"
+  } > "playwright.config.ts"
+}
+
+format_files() {
+  prettier_bin="./node_modules/.bin/prettier"
+
+  if [[ -x "$prettier_bin" ]]; then
+    echo -e "✨ \e[3;2mFormatting the generated files with Prettier\e[0m"
+    "$prettier_bin" "{tests,pages,fixtures}/**/*.ts" "${normalized_project_name}.config.ts" "playwright.config.ts" --write --config ./.prettierrc > /dev/null
+  fi
+}
+
+read_file() {
+  echo -e "📚 \e[3;2mReading the .tsv file\e[0m"
+  while IFS= read -r line; do
+    define_columns_and_dir
+    echo -ne "\r📝 \e[3;2mWriting "$test_title"...\e[0m\e[K"
+    if [[ "$test_status" == "Automated" ]]; then
+        create_POM_file
+        create_fixture_file
+        create_config_file
+        add_test_case    
+    fi
+  done < <(cat "$file_path")
+  echo -ne "\r\e[K"  
+  create_spec_file
+}
+
+generate_test_files() {
+  echo -e "\n\e[1mTest Files Generator - Upgrades Team @ \e[34mLiferay\e[0m\n"
+
+  cd "$(git rev-parse --show-toplevel)" || exit 1
+
+  ignore_env=false
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -n|--project-name)
+        project_name="${2^}"
+        normalized_project_name="$(normalize_string "$project_name")"
+        shift 2  
+        ;;
+      -e|--ignore-env)
+        ignore_env=true
+        shift 1
+        ;;
+      -h|--help)
+        show_help
+        exit 0
+        ;;
+      *)  
+        if [[ -z "$file_path" ]]; then
+          file_path="$1"
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  if [[ -z "$file_path" || ! "$file_path" == *.tsv ]]; then
+    echo "Please, input a path to a TSV (.tsv) file."
+    exit 1
+  fi
+
+  if [[ ! -f "$file_path" ]]; then
+    echo "File not found."
+    exit 1
+  fi
+
+  if [[ -z "$project_name" ]]; then
+    echo -e "🛑 \e[1;33mNo project name detected. Please, enter a project name: \e[0m\c"
+    read user_input
+    upper_case="${user_input^}"
+    project_name=${upper_case:-"project"}
+    normalized_project_name=$(normalize_string "$project_name")
+    tput cuu1
+    echo -ne "\r"
+    tput el
+    tput cuu1
+  fi
+
+  read_file
+  read_env_file
+  create_project_config
+  create_playwright_config
+  format_files
+
+  echo -e "\n🎉 \e[1;32mSuccessfully created the $project_name test files\e[0m"
+}
+
+generate_test_files "$@"
+
