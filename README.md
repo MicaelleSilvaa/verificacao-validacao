@@ -1,21 +1,79 @@
-# Automated Tests - Cancêr Ocupacional
+# 🧪 Automated Tests - Câncer de pulmao
 
-## Presets
+Este repositório contém testes automatizados para o sistema **Câncer de pulmao**, utilizando [Playwright](https://playwright.dev/) como framework principal de testes de interface.
 
-This repository includes `settings.json` and `extensions.json` to ensure a consistent development environment when writing automated tests.
+## 📁 Estrutura do Repositório
 
-### Workspace settings
+Incluímos os arquivos `settings.json` e `extensions.json` para garantir um ambiente de desenvolvimento consistente entre todos os membros da equipe.
 
-The `settings.json` file defines workspace-specific configurations, overriding user settings and preventing further modifications. This ensures that formatting, linting, and other essential actions are consistently applied across all team members' local repositories.
+### ✅ Configurações da Workspace
 
-### Required Extensions
+- O arquivo `settings.json` define configurações específicas do projeto que sobrescrevem as do usuário, como formatação, linting e outras ações importantes para manter a padronização.
 
-To enhance the development experience while maintaining code consistency, the following extensions are required in your editor (preferably VSCode):
+### 🧩 Extensões Recomendadas
 
--   [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
--   [Playwright](https://marketplace.visualstudio.com/items?itemName=ms-playwright.playwright)
--   [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint)
--   [GitLens](https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens)
+Para uma melhor experiência de desenvolvimento (especialmente usando o VSCode), recomendamos instalar as seguintes extensões:
 
-> [!NOTE]
-> The `extensions.json` file includes the extensions listed above. VSCode may prompt you with a notification to install them all at once.
+- [Prettier – Code formatter](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
+- [Playwright Test for VSCode](https://marketplace.visualstudio.com/items?itemName=ms-playwright.playwright)
+- [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint)
+- [GitLens — Git supercharged](https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens)
+
+> 📌 O VSCode pode sugerir automaticamente a instalação dessas extensões através do `extensions.json`.
+
+---
+
+## ⚙️ Configuração do Projeto
+
+Siga os passos abaixo para configurar o ambiente e executar os testes com o Playwright:
+
+### 1. Clone o repositório
+
+```bash
+git clone <url-do-repo>
+cd <nome-do-projeto>
+
+### 2. Instale as dependências
+
+npm install
+
+### 3. Inicialize o Playwright
+Este comando instala o Playwright e prepara a estrutura inicial do projeto:
+
+npm init playwright@latest
+
+Siga as instruções no terminal e escolha as opções conforme necessário (você pode escolher usar TypeScript, instalar os navegadores, etc.).
+
+🚀 Executando os Testes
+
+### Rodar todos os testes
+
+npx playwright test
+
+### Rodar um teste específico com interface (modo headed)
+
+npx playwright test tests/form/form.spec.ts --headed
+
+### Rodar um teste específico em modo debug
+
+npx playwright test tests/form/form.spec.ts --debug
+
+🔍 Gerador de Código (Codegen)
+O Playwright permite gerar código automaticamente com base nas ações que você executa manualmente no navegador.
+
+### Exemplo básico de uso:
+
+npx playwright codegen http://localhost:3000
+
+### Exemplo para uma página específica:
+
+npx playwright codegen http://localhost:3000/Sistema
+
+💡 Dicas Úteis
+
+Use o comando --debug para investigar testes que estão falhando, com pausas automáticas e ferramentas de inspeção.
+
+Combine --headed e --debug para visualizar a execução dos testes.
+
+Utilize o codegen para acelerar a criação de novos testes.
+
