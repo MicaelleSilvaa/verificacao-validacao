@@ -1,6 +1,6 @@
-# 🧪 Automated Tests - Câncer de pulmao
+# 🧪 Automated Tests - Câncer de Pulmão
 
-Este repositório contém testes automatizados para o sistema **Câncer de pulmao**, utilizando [Playwright](https://playwright.dev/) como framework principal de testes de interface.
+Este repositório contém testes automatizados para o sistema **Câncer de Pulmão**, utilizando [Playwright](https://playwright.dev/) como framework principal de testes de interface.
 
 ## 📁 Estrutura do Repositório
 
@@ -32,44 +32,52 @@ Siga os passos abaixo para configurar o ambiente e executar os testes com o Play
 ```bash
 git clone <url-do-repo>
 cd <nome-do-projeto>
+```
 
 ### 2. Instale as dependências
-
+```bash
 npm install
+```
 
 ### 3. Inicialize o Playwright
 Este comando instala o Playwright e prepara a estrutura inicial do projeto:
-
+```bash
 npm init playwright@latest
+```
 
 Siga as instruções no terminal e escolha as opções conforme necessário (você pode escolher usar TypeScript, instalar os navegadores, etc.).
 
-🚀 Executando os Testes
+## 🚀 Executando os Testes
 
 ### Rodar todos os testes
-
+```bash
 npx playwright test
+```
 
 ### Rodar um teste específico com interface (modo headed)
-
+```bash
 npx playwright test tests/form/form.spec.ts --headed
+```
 
 ### Rodar um teste específico em modo debug
-
+```bash
 npx playwright test tests/form/form.spec.ts --debug
+```
 
-🔍 Gerador de Código (Codegen)
+## 🔍 Gerador de Código (Codegen)
 O Playwright permite gerar código automaticamente com base nas ações que você executa manualmente no navegador.
 
 ### Exemplo básico de uso:
-
+```bash
 npx playwright codegen http://localhost:3000
+```
 
 ### Exemplo para uma página específica:
-
+```bash
 npx playwright codegen http://localhost:3000/Sistema
+```
 
-💡 Dicas Úteis
+## 💡 Dicas Úteis
 
 Use o comando --debug para investigar testes que estão falhando, com pausas automáticas e ferramentas de inspeção.
 
