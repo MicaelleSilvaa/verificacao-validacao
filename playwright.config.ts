@@ -1,7 +1,8 @@
 import { defineConfig } from '@playwright/test';
 import { projectConfig } from './project.config';
 
-import { config as login } from './tests/login/config';
+import { config as form } from './tests/form/config';
+import { config as chat } from './tests/chatBot/config';
 
 export default defineConfig({
 	testDir: './tests',
@@ -21,5 +22,5 @@ export default defineConfig({
 		trace: 'on-first-retry',
 	},
 
-	projects: [login],
+	projects: [form, chat],
 });
