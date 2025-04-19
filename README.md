@@ -77,6 +77,40 @@ npx playwright codegen http://localhost:3000
 npx playwright codegen http://localhost:3000/Sistema
 ```
 
+## 💻 Testes Backend com Jest
+
+Além dos testes de interface, este projeto também realiza testes de backend utilizando o Jest. No entanto, devido a um conflito de dependências com o Playwright, estamos rodando o Jest diretamente da pasta `testbackend`. Siga os passos abaixo para configurar e executar os testes de backend:
+
+### 1. Instale as dependências do Jest e do Playwright
+```bash
+npm install playwright @playwright/test jest ts-jest
+```
+
+### 2. Instale o TypeScript e os tipos do Jest
+```bash
+npm install typescript @types/jest
+```
+
+### 3. Instale o Axios para realizar requisições HTTP
+```bash
+npm install axios
+```
+
+### 4. Rodar os testes com Jest
+Execute o comando abaixo para rodar os testes de backend:
+```bash
+npx jest
+```
+
+### 5. Configurar o Jest (caso necessário)
+Se necessário, use um arquivo de configuração para Jest, como o jest.config.ts, com o comando:
+```bash
+npx jest --config jest.config.ts
+```
+
+### Observação Importante
+Devido a um conflito de dependências com o Playwright, os testes Jest são executados diretamente da página de tests-backend/backend, para garantir que o ambiente do backend esteja isolado e as dependências sejam corretamente gerenciadas.
+
 ## 💡 Dicas Úteis
 
 Use o comando --debug para investigar testes que estão falhando, com pausas automáticas e ferramentas de inspeção.
