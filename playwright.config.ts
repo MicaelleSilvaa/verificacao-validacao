@@ -3,6 +3,7 @@ import { projectConfig } from './project.config';
 
 import { config as form } from './tests/form/config';
 import { config as chat } from './tests/chatBot/config';
+import { config as uiResponsive } from './tests/uiResponsive/config';
 
 export default defineConfig({
 	testDir: './tests',
@@ -22,5 +23,5 @@ export default defineConfig({
 		trace: 'on-first-retry',
 	},
 
-	projects: [form, chat],
+	projects: [form, chat, uiResponsive],
 });
