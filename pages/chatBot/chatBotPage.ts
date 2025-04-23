@@ -6,14 +6,16 @@ export class ChatBotPage {
 	readonly heading: Locator;
 	readonly startButton: Locator;
 	readonly firstMessagePrompt: Locator;
-	
 
 	constructor(page: Page) {
 		this.page = page;
 		this.logo = page.getByRole('link', { name: 'logo LungAI' });
-		this.heading = page.getByRole('heading', { name: 'Vamos iniciar a sua consulta?' });
+		this.heading = page.getByRole('heading', {
+			name: 'Vamos iniciar a sua consulta?',
+		});
 		this.startButton = page.getByRole('button', { name: 'Vamos iniciar!' });
-		this.firstMessagePrompt = page.getByText('Envie sua primeira mensagem');
-
+		this.firstMessagePrompt = page.getByRole('textbox', {
+			name: 'Escreva a sua mensagem...',
+		});
 	}
 }

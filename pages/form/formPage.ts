@@ -4,16 +4,24 @@ export class FormPage {
 	private readonly page: Page;
 	readonly titlePage: Locator;
 	private readonly buttonSend: Locator;
+	readonly fieldResult: Locator;
 
 	constructor(page: Page) {
 		this.page = page;
-		this.titlePage = page.locator('div').filter({ hasText: 'Previsão de Câncer de Pulmão' });
+		this.titlePage = page
+			.locator('div')
+			.filter({ hasText: 'Previsão de Câncer de Pulmão' });
 		this.buttonSend = page.getByRole('button', { name: 'Enviar' });
+		this.fieldResult = page.getByRole('heading', { name: 'Resultado:' });
 	}
 
 	private async fillSelectField(fieldId: string, optionName: string) {
-		const referenceComponent = this.page.locator(`#mui-component-select-${fieldId}`);
-		const optionComponent = this.page.getByRole('option', { name: optionName });
+		const referenceComponent = this.page.locator(
+			`#mui-component-select-${fieldId}`,
+		);
+		const optionComponent = this.page.getByRole('option', {
+			name: optionName,
+		});
 
 		await referenceComponent.click();
 		await optionComponent.click();

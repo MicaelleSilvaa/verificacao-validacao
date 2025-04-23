@@ -4,7 +4,7 @@ import { projectConfig } from '../../project.config';
 
 export const test = mergeTests(chatPage);
 
-test('it should be possible to start a medical consultation', async ({
+test('it should be possible go to chatBot page', async ({
 	pages,
 }) => {
 	const { chatBotPage, utilityPages } = pages;

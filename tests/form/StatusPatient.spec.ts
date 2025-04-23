@@ -14,4 +14,5 @@ test('it should be possible to consult the patients current state of health', as
 
 	await form.fillForm();
 	await form.submitForm();
+	expect(form.fieldResult).toBeVisible();
 });
